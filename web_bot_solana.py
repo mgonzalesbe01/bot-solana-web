@@ -2,7 +2,7 @@ import sys
 import time
 import threading
 import logging
-import requests # Necesario para el auto-ping
+import requests
 from datetime import datetime
 from flask import Flask, render_template_string, jsonify, request
 
@@ -23,8 +23,8 @@ CAPITAL_TOTAL = 100.00
 NUMERO_GRIDS = 6
 RANGO_PORCENTAJE = 0.03
 COMISION_SIMULADA = 0.001
-# IMPORTANTE: Aquí debes poner tu URL de Render una vez que esté funcionando
-APP_URL = "https://bot-solana-martin.onrender.com"
+# RECUERDA: Pon tu URL aquí para que no se duerma
+APP_URL = "https://bot-solana-martin.onrender.com" 
 # =========================================================
 
 # --- INTERFAZ WEB (HTML/CSS/JS) ---
@@ -40,9 +40,11 @@ HTML_TEMPLATE = """
         body { background-color: #0b0e11; color: #eaeaea; font-family: 'Inter', sans-serif; }
         .card { background-color: #1e2329; border: none; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
         .stat-card { padding: 25px; text-align: center; border: 1px solid #2b3139; }
-        .btn-start { background-color: #2ebd85; border: none; color: white; font-weight: 600; transition: 0.3s; }
-        .btn-start:hover { background-color: #26a373; transform: scale(1.02); }
-        .btn-stop { background-color: #f6465d; border: none; color: white; font-weight: 600; }
+        
+        /* Botones Profesionales */
+        .btn-start { background-color: #2ebd85; border: none; color: white; font-weight: 600; padding: 12px; transition: 0.3s; }
+        .btn-start:hover:not(:disabled) { background-color: #26a373; transform: scale(1.02); }
+        .btn-stop { background-color: #f6465d; border: none; color: white; font-weight: 600; padding: 12px; }
         
         .log-container { 
             height: 400px; 
@@ -55,25 +57,25 @@ HTML_TEMPLATE = """
             border: 1px solid #2b3139;
         }
         
-        /* Ajustes de Visibilidad Solicitados */
+        /* VISIBILIDAD DE TEXTOS (MEJORADA) */
         .text-white-bright { color: #ffffff !important; }
-        .text-label { color: #b7bdc6 !important; } /* Gris claro para etiquetas */
+        .text-label { color: #d1d4dc !important; font-weight: 500; } /* Gris muy claro */
         
         .stat-main-value { 
-            font-size: 2.5rem; 
+            font-size: 2.8rem; 
             font-weight: 800; 
-            color: #ffffff; 
-            text-shadow: 0 2px 10px rgba(255,255,255,0.1);
+            color: #ffffff !important; 
+            text-shadow: 0 2px 10px rgba(255,255,255,0.2);
+            margin: 5px 0;
         }
         
-        .text-profit { color: #2ebd85; }
-        .text-loss { color: #f6465d; }
+        .text-profit { color: #2ebd85; font-weight: bold; }
+        .text-loss { color: #f6465d; font-weight: bold; }
         .grid-line { border-left: 4px solid #474d57; padding-left: 10px; margin-bottom: 5px; }
         
         /* Scrollbar */
         ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: #0b0e11; }
-        ::-webkit-scrollbar-thumb { background: #2b3139; border-radius: 10px; }
+        ::-webkit-scrollbar-thumb { background: #474d57; border-radius: 10px; }
     </style>
 </head>
 <body>
@@ -81,10 +83,10 @@ HTML_TEMPLATE = """
         <div class="row mb-4 align-items-center">
             <div class="col-md-8">
                 <h2 class="mb-0">🤖 Solana <span class="text-warning">Grid Bot</span></h2>
-                <p class="text-label mb-0">Sistema de trading automático institucional</p>
+                <p class="text-label mb-0">Monitoreo Profesional de Activos Digitales</p>
             </div>
             <div class="col-md-4 text-md-end">
-                <span id="status-badge" class="badge bg-secondary">Cargando...</span>
+                <span id="status-badge" class="badge bg-secondary fs-6">Sincronizando...</span>
             </div>
         </div>
 
@@ -92,23 +94,27 @@ HTML_TEMPLATE = """
             <div class="col-lg-4">
                 <!-- VALOR TOTAL -->
                 <div class="card stat-card">
-                    <small class="text-label text-uppercase">Valor Total de Cartera</small>
-                    <div id="equity-val" class="stat-main-value mt-1">$0.00</div>
-                    <div id="pnl-val" class="fs-5 fw-bold">$0.00 (0%)</div>
+                    <small class="text-label text-uppercase small">Valor Total de Cartera</small>
+                    <div id="equity-val" class="stat-main-value">$0.00</div>
+                    <div id="pnl-val" class="fs-5">$0.00 (0%)</div>
                 </div>
 
                 <!-- CONTROLES -->
                 <div class="card p-3">
-                    <h6 class="text-label mb-3 text-uppercase small fw-bold">Controles</h6>
+                    <h6 class="text-label mb-3 text-uppercase small fw-bold">Panel de Control</h6>
                     <div class="d-grid gap-2">
                         <button id="btn-start" onclick="startBot()" class="btn btn-start">ACTIVAR ALGORITMO</button>
-                        <button id="btn-stop" onclick="stopBot()" class="btn btn-stop" disabled>DETENER SISTEMA</button>
+                        <button id="btn-stop" onclick="stopBot()" class="btn btn-danger btn-stop" disabled>DETENER SISTEMA</button>
                     </div>
                 </div>
 
                 <!-- DESGLOSE -->
                 <div class="card p-3">
-                    <h6 class="text-label mb-3 text-uppercase small fw-bold">Desglose de Activos</h6>
+                    <h6 class="text-label mb-3 text-uppercase small fw-bold">Desglose de Fondos</h6>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-label">Capital Inicial:</span>
+                        <span class="text-white-bright fw-bold">$100.00</span>
+                    </div>
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-label">Saldo USDT:</span>
                         <span id="usdt-bal" class="text-white-bright fw-bold">$0.00</span>
@@ -124,11 +130,11 @@ HTML_TEMPLATE = """
             <div class="col-lg-8">
                 <div class="card p-3 h-100">
                     <div class="d-flex justify-content-between mb-3">
-                        <h6 class="text-label mb-0 text-uppercase small fw-bold">Ejecución en Tiempo Real</h6>
-                        <small id="last-update" class="text-label">Sincronizando...</small>
+                        <h6 class="text-label mb-0 text-uppercase small fw-bold">Actividad del Algoritmo</h6>
+                        <small id="last-update" class="text-label small">Actualizando...</small>
                     </div>
                     <div id="log-box" class="log-container">
-                        <div class="text-secondary italic">Esperando señal del servidor...</div>
+                        <div class="text-secondary small">Sistema listo para iniciar...</div>
                     </div>
                 </div>
             </div>
@@ -143,8 +149,8 @@ HTML_TEMPLATE = """
                     document.getElementById('btn-start').disabled = data.running;
                     document.getElementById('btn-stop').disabled = !data.running;
                     const badge = document.getElementById('status-badge');
-                    badge.innerText = data.running ? "SISTEMA ACTIVO" : "SISTEMA EN PAUSA";
-                    badge.className = data.running ? "badge bg-success" : "badge bg-danger";
+                    badge.innerText = data.running ? "BOT ACTIVO" : "BOT EN PAUSA";
+                    badge.className = "badge fs-6 " + (data.running ? "bg-success" : "bg-danger");
                     
                     document.getElementById('equity-val').innerText = "$" + data.equity.toFixed(2);
                     document.getElementById('usdt-bal').innerText = "$" + data.usdt.toFixed(2);
@@ -159,11 +165,12 @@ HTML_TEMPLATE = """
                     const logBox = document.getElementById('log-box');
                     logBox.innerHTML = data.logs.join("");
                     logBox.scrollTop = logBox.scrollHeight;
-                    document.getElementById('last-update').innerText = "Último tick: " + new Date().toLocaleTimeString();
+                    document.getElementById('last-update').innerText = "Update: " + new Date().toLocaleTimeString();
                 })
                 .catch(e => {
-                    document.getElementById('status-badge').innerText = "ERROR DE CONEXIÓN";
-                    document.getElementById('status-badge').className = "badge bg-warning text-dark";
+                    const badge = document.getElementById('status-badge');
+                    badge.innerText = "ERROR DE CONEXIÓN";
+                    badge.className = "badge bg-warning text-dark fs-6";
                 });
         }
         function startBot() { fetch('/start', {method: 'POST'}); }
@@ -178,7 +185,12 @@ class GridBotEngine:
     def __init__(self):
         self.running = False
         self.logs = []
-        self.exchange = ccxt.binance({'enableRateLimit': True})
+        # Configuración de Exchange más robusta para evitar bloqueos en la nube
+        self.exchange = ccxt.binance({
+            'enableRateLimit': True,
+            'timeout': 30000,
+            'options': {'adjustForTimeDifference': True}
+        })
         self.usdt = CAPITAL_TOTAL
         self.sol = 0.0
         self.equity = CAPITAL_TOTAL
@@ -195,13 +207,17 @@ class GridBotEngine:
         if len(self.logs) > 60: self.logs.pop(0)
 
     def get_market_price(self):
-        try:
-            return float(self.exchange.fetch_ticker(PAR_MONEDA)['last'])
-        except:
-            return None
+        # Reintento automático para evitar fallos temporales de red en Render
+        for i in range(3):
+            try:
+                ticker = self.exchange.fetch_ticker(PAR_MONEDA)
+                return float(ticker['last'])
+            except Exception as e:
+                time.sleep(1) # Esperar un segundo antes de reintentar
+        return None
 
     def setup_grids(self, precio):
-        self.add_log(f"Configurando rejilla en ${precio:.2f}...")
+        self.add_log(f"Configurando arquitectura en ${precio:.2f}...")
         techo = precio * (1 + RANGO_PORCENTAJE)
         piso = precio * (1 - RANGO_PORCENTAJE)
         paso = (techo - piso) / NUMERO_GRIDS
@@ -212,18 +228,24 @@ class GridBotEngine:
             nivel += paso
 
     def main_loop(self):
+        self.add_log("🔄 Sincronizando con el mercado...")
         precio_inicial = self.get_market_price()
+        
         if not precio_inicial:
-            self.add_log("Error de conexión", "error")
+            self.add_log("⚠️ Error de conexión persistente. Reintenta en unos segundos.", "error")
             self.running = False
             return
+            
         self.setup_grids(precio_inicial)
         inversion_por_nivel = CAPITAL_TOTAL / NUMERO_GRIDS
+        
         while self.running:
             try:
                 precio_actual = self.get_market_price()
                 if not precio_actual: continue
+                
                 self.equity = self.usdt + (self.sol * precio_actual)
+                
                 for linea in self.grids:
                     if precio_actual < linea['precio'] and not linea['comprado']:
                         if self.usdt >= inversion_por_nivel:
@@ -231,7 +253,8 @@ class GridBotEngine:
                             self.usdt -= inversion_por_nivel
                             self.sol += (cantidad * (1 - COMISION_SIMULADA))
                             linea['comprado'] = True
-                            self.add_log(f"COMPRA Nivel {linea['id']} (${precio_actual:.2f})", "compra")
+                            self.add_log(f"🟢 COMPRA Nivel {linea['id']} (${precio_actual:.2f})", "compra")
+                            
                     elif linea['comprado'] and precio_actual > (linea['precio'] * 1.015):
                         cantidad_venta = inversion_por_nivel / linea['precio']
                         valor_venta = cantidad_venta * precio_actual
@@ -239,7 +262,8 @@ class GridBotEngine:
                         self.usdt += (valor_venta * (1 - COMISION_SIMULADA))
                         linea['comprado'] = False
                         profit = valor_venta - inversion_por_nivel
-                        self.add_log(f"VENTA exitosa. Profit: +${profit:.2f}", "venta")
+                        self.add_log(f"🚀 VENTA EXITOSA. Profit: +${profit:.2f}", "venta")
+                
                 time.sleep(2)
             except Exception as e:
                 logger.error(f"Error: {e}")
@@ -248,15 +272,12 @@ class GridBotEngine:
 app = Flask(__name__)
 bot = GridBotEngine()
 
-# --- FUNCIÓN PARA EVITAR QUE SE DUERMA ---
 def stay_awake():
-    """Realiza una petición a sí mismo cada 10 minutos"""
     while True:
-        time.sleep(600) # 10 minutos
+        time.sleep(600)
         if APP_URL:
             try:
                 requests.get(APP_URL + "/status")
-                logger.info("Keep-alive ping enviado.")
             except:
                 pass
 
@@ -287,6 +308,5 @@ def status():
     })
 
 if __name__ == '__main__':
-    # Iniciar hilo de auto-ping
     threading.Thread(target=stay_awake, daemon=True).start()
     app.run(host='0.0.0.0', port=5000)
