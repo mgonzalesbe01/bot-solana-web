@@ -23,7 +23,7 @@ CAPITAL_TOTAL = 100.00
 NUMERO_GRIDS = 6
 RANGO_PORCENTAJE = 0.03
 COMISION_SIMULADA = 0.001
-APP_URL = "" # Aquí pondrás tu URL de Render una vez la tengas
+APP_URL = "https://bot-solana-martin.onrender.com" # Aquí pondrás tu URL de Render una vez la tengas
 # =========================================================
 
 # --- INTERFAZ WEB (HTML/CSS/JS) ---
