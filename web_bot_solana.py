@@ -23,7 +23,8 @@ CAPITAL_TOTAL = 100.00
 NUMERO_GRIDS = 6
 RANGO_PORCENTAJE = 0.03
 COMISION_SIMULADA = 0.001
-APP_URL = "https://bot-solana-martin.onrender.com" # Aquí pondrás tu URL de Render una vez la tengas
+# IMPORTANTE: Aquí debes poner tu URL de Render una vez que esté funcionando
+APP_URL = "" 
 # =========================================================
 
 # --- INTERFAZ WEB (HTML/CSS/JS) ---
@@ -37,10 +38,12 @@ HTML_TEMPLATE = """
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body { background-color: #0b0e11; color: #eaeaea; font-family: 'Inter', sans-serif; }
-        .card { background-color: #1e2329; border: none; border-radius: 12px; margin-bottom: 20px; }
-        .stat-card { padding: 20px; text-align: center; }
-        .btn-start { background-color: #2ebd85; border: none; color: white; font-weight: 600; }
+        .card { background-color: #1e2329; border: none; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
+        .stat-card { padding: 25px; text-align: center; border: 1px solid #2b3139; }
+        .btn-start { background-color: #2ebd85; border: none; color: white; font-weight: 600; transition: 0.3s; }
+        .btn-start:hover { background-color: #26a373; transform: scale(1.02); }
         .btn-stop { background-color: #f6465d; border: none; color: white; font-weight: 600; }
+        
         .log-container { 
             height: 400px; 
             overflow-y: auto; 
@@ -51,9 +54,26 @@ HTML_TEMPLATE = """
             font-size: 0.85rem;
             border: 1px solid #2b3139;
         }
+        
+        /* Ajustes de Visibilidad Solicitados */
+        .text-white-bright { color: #ffffff !important; }
+        .text-label { color: #b7bdc6 !important; } /* Gris claro para etiquetas */
+        
+        .stat-main-value { 
+            font-size: 2.5rem; 
+            font-weight: 800; 
+            color: #ffffff; 
+            text-shadow: 0 2px 10px rgba(255,255,255,0.1);
+        }
+        
         .text-profit { color: #2ebd85; }
         .text-loss { color: #f6465d; }
         .grid-line { border-left: 4px solid #474d57; padding-left: 10px; margin-bottom: 5px; }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0b0e11; }
+        ::-webkit-scrollbar-thumb { background: #2b3139; border-radius: 10px; }
     </style>
 </head>
 <body>
@@ -61,7 +81,7 @@ HTML_TEMPLATE = """
         <div class="row mb-4 align-items-center">
             <div class="col-md-8">
                 <h2 class="mb-0">🤖 Solana <span class="text-warning">Grid Bot</span></h2>
-                <p class="text-secondary mb-0">Sistema de trading automático institucional</p>
+                <p class="text-label mb-0">Sistema de trading automático institucional</p>
             </div>
             <div class="col-md-4 text-md-end">
                 <span id="status-badge" class="badge bg-secondary">Cargando...</span>
@@ -70,41 +90,45 @@ HTML_TEMPLATE = """
 
         <div class="row">
             <div class="col-lg-4">
+                <!-- VALOR TOTAL -->
                 <div class="card stat-card">
-                    <small class="text-secondary">VALOR TOTAL DE CARTERA</small>
-                    <div id="equity-val" class="display-6 fw-bold mt-1">$0.00</div>
+                    <small class="text-label text-uppercase">Valor Total de Cartera</small>
+                    <div id="equity-val" class="stat-main-value mt-1">$0.00</div>
                     <div id="pnl-val" class="fs-5 fw-bold">$0.00 (0%)</div>
                 </div>
 
+                <!-- CONTROLES -->
                 <div class="card p-3">
-                    <h6 class="text-secondary mb-3">CONTROLES</h6>
+                    <h6 class="text-label mb-3 text-uppercase small fw-bold">Controles</h6>
                     <div class="d-grid gap-2">
                         <button id="btn-start" onclick="startBot()" class="btn btn-start">ACTIVAR ALGORITMO</button>
                         <button id="btn-stop" onclick="stopBot()" class="btn btn-stop" disabled>DETENER SISTEMA</button>
                     </div>
                 </div>
 
+                <!-- DESGLOSE -->
                 <div class="card p-3">
-                    <h6 class="text-secondary mb-3">DESGLOSE DE ACTIVOS</h6>
+                    <h6 class="text-label mb-3 text-uppercase small fw-bold">Desglose de Activos</h6>
                     <div class="d-flex justify-content-between mb-2">
-                        <span>Saldo USDT:</span>
-                        <span id="usdt-bal" class="fw-bold">$0.00</span>
+                        <span class="text-label">Saldo USDT:</span>
+                        <span id="usdt-bal" class="text-white-bright fw-bold">$0.00</span>
                     </div>
                     <div class="d-flex justify-content-between">
-                        <span>Saldo SOL:</span>
-                        <span id="sol-bal" class="fw-bold text-warning">0.0000</span>
+                        <span class="text-label">Saldo SOL:</span>
+                        <span id="sol-bal" class="fw-bold text-warning">0.0000 SOL</span>
                     </div>
                 </div>
             </div>
 
+            <!-- LOGS -->
             <div class="col-lg-8">
-                <div class="card p-3">
+                <div class="card p-3 h-100">
                     <div class="d-flex justify-content-between mb-3">
-                        <h6 class="text-secondary mb-0">EJECUCIÓN EN TIEMPO REAL</h6>
-                        <small id="last-update" class="text-secondary">Sincronizando...</small>
+                        <h6 class="text-label mb-0 text-uppercase small fw-bold">Ejecución en Tiempo Real</h6>
+                        <small id="last-update" class="text-label">Sincronizando...</small>
                     </div>
                     <div id="log-box" class="log-container">
-                        <div class="text-secondary">Esperando señal del servidor...</div>
+                        <div class="text-secondary italic">Esperando señal del servidor...</div>
                     </div>
                 </div>
             </div>
@@ -121,18 +145,25 @@ HTML_TEMPLATE = """
                     const badge = document.getElementById('status-badge');
                     badge.innerText = data.running ? "SISTEMA ACTIVO" : "SISTEMA EN PAUSA";
                     badge.className = data.running ? "badge bg-success" : "badge bg-danger";
+                    
                     document.getElementById('equity-val').innerText = "$" + data.equity.toFixed(2);
                     document.getElementById('usdt-bal').innerText = "$" + data.usdt.toFixed(2);
                     document.getElementById('sol-bal').innerText = data.sol.toFixed(4) + " SOL";
+                    
                     const pnl = data.pnl;
                     const pnlPercent = (pnl / 100) * 100;
                     const pnlEl = document.getElementById('pnl-val');
                     pnlEl.innerText = (pnl >= 0 ? "+" : "") + "$" + pnl.toFixed(2) + " (" + pnlPercent.toFixed(2) + "%)";
                     pnlEl.className = "fs-5 fw-bold " + (pnl >= 0 ? "text-profit" : "text-loss");
+                    
                     const logBox = document.getElementById('log-box');
                     logBox.innerHTML = data.logs.join("");
                     logBox.scrollTop = logBox.scrollHeight;
                     document.getElementById('last-update').innerText = "Último tick: " + new Date().toLocaleTimeString();
+                })
+                .catch(e => {
+                    document.getElementById('status-badge').innerText = "ERROR DE CONEXIÓN";
+                    document.getElementById('status-badge').className = "badge bg-warning text-dark";
                 });
         }
         function startBot() { fetch('/start', {method: 'POST'}); }
