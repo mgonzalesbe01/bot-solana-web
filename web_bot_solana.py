@@ -24,7 +24,7 @@ NUMERO_GRIDS = 6
 RANGO_PORCENTAJE = 0.03
 COMISION_SIMULADA = 0.001
 # IMPORTANTE: Aquí debes poner tu URL de Render una vez que esté funcionando
-APP_URL = "" 
+APP_URL = "https://bot-solana-martin.onrender.com"
 # =========================================================
 
 # --- INTERFAZ WEB (HTML/CSS/JS) ---
