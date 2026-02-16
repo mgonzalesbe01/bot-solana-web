@@ -5,7 +5,9 @@ import logging
 import requests
 import random
 from datetime import datetime
-import pytz # Librería para zonas horarias
+import pytz
+# ESTA ES LA LÍNEA QUE FALTABA:
+from flask import Flask, render_template_string, jsonify, request
 
 # --- CONFIGURACIÓN DE LOGS ---
 logging.basicConfig(level=logging.INFO)
@@ -25,8 +27,7 @@ NUMERO_GRIDS = 6
 RANGO_PORCENTAJE = 0.03
 COMISION_SIMULADA = 0.001
 
-# ZONA HORARIA: Ajustado para Perú (America/Lima)
-# Puedes cambiarlo a 'America/Mexico_City', 'America/Argentina/Buenos_Aires', etc.
+# ZONA HORARIA: America/Lima
 ZONA_HORARIA = pytz.timezone('America/Lima')
 
 # URL de Render para el stay_awake
@@ -64,7 +65,7 @@ HTML_TEMPLATE = """
         <div class="row mb-4 align-items-center">
             <div class="col-md-8">
                 <h2 class="mb-0 text-white-bright">🤖 Solana <span class="text-warning">Grid Bot</span></h2>
-                <p class="text-white-bright opacity-75 mb-0">Tecnología Stealth + Hora Local Activa</p>
+                <p class="text-white-bright opacity-75 mb-0">Monitor Profesional (Hora Local)</p>
             </div>
             <div class="col-md-4 text-md-end">
                 <span id="status-badge" class="badge bg-secondary fs-6">Sincronizando...</span>
@@ -103,11 +104,11 @@ HTML_TEMPLATE = """
             <div class="col-lg-8">
                 <div class="card p-3 h-100">
                     <div class="d-flex justify-content-between mb-3">
-                        <h6 class="text-label mb-0 text-uppercase small fw-bold">FLUJO DE OPERACIONES (HORA LOCAL)</h6>
+                        <h6 class="text-label mb-0 text-uppercase small fw-bold">FLUJO DE OPERACIONES</h6>
                         <small id="last-update" class="text-white-bright opacity-50 small">--:--</small>
                     </div>
                     <div id="log-box" class="log-container">
-                        <div class="text-secondary small">Sincronizando reloj con zona horaria...</div>
+                        <div class="text-secondary small">Listo para operar...</div>
                     </div>
                 </div>
             </div>
@@ -156,10 +157,8 @@ class GridBotEngine:
         ]
 
     def add_log(self, mensaje, tipo="info"):
-        # USAR HORA LOCAL CONFIGURADA
         ahora_local = datetime.now(ZONA_HORARIA)
         timestamp = ahora_local.strftime("%H:%M:%S")
-        
         color = "#848e9c"
         if tipo == "compra": color = "#2ebd85"
         if tipo == "venta": color = "#f0b90b"
@@ -170,13 +169,13 @@ class GridBotEngine:
 
     def get_market_price(self):
         headers = {'User-Agent': random.choice(self.user_agents)}
-        # Estrategia Multifuente para evitar bloqueos de IP
+        # 1. Binance
         try:
             url = f"https://api.binance.com/api/v3/ticker/price?symbol=SOLUSDT"
             res = requests.get(url, headers=headers, timeout=5)
             if res.status_code == 200: return float(res.json()['price'])
         except: pass
-
+        # 2. CoinGecko
         try:
             url = "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd"
             res = requests.get(url, headers=headers, timeout=5)
@@ -196,26 +195,21 @@ class GridBotEngine:
             nivel += paso
 
     def main_loop(self):
-        self.add_log("🕵️ Sincronizando precio en tiempo real...")
+        self.add_log("🕵️ Sincronizando precio...")
         precio_inicial = self.get_market_price()
-        
         if not precio_inicial:
             self.add_log("❌ Error: Todas las fuentes están bloqueadas.", "error")
             self.running = False
             return
-            
         self.setup_grids(precio_inicial)
         inversion_por_nivel = CAPITAL_TOTAL / NUMERO_GRIDS
-        
         while self.running:
             try:
                 precio_actual = self.get_market_price()
                 if not precio_actual: 
                     time.sleep(10)
                     continue
-                
                 self.equity = self.usdt + (self.sol * precio_actual)
-                
                 for linea in self.grids:
                     if precio_actual < linea['precio'] and not linea['comprado']:
                         if self.usdt >= inversion_por_nivel:
@@ -223,7 +217,6 @@ class GridBotEngine:
                             self.sol += (inversion_por_nivel / precio_actual) * (1 - COMISION_SIMULADA)
                             linea['comprado'] = True
                             self.add_log(f"🟢 COMPRA Nivel {linea['id']} (${precio_actual:.2f})", "compra")
-                            
                     elif linea['comprado'] and precio_actual > (linea['precio'] * 1.015):
                         cant = inversion_por_nivel / linea['precio']
                         self.sol -= cant
@@ -231,7 +224,6 @@ class GridBotEngine:
                         linea['comprado'] = False
                         profit = (cant * precio_actual) - inversion_por_nivel
                         self.add_log(f"🚀 VENTA Nivel {linea['id']} | Profit: +${profit:.2f}", "venta")
-                
                 time.sleep(random.uniform(5, 8))
             except Exception as e:
                 time.sleep(10)
