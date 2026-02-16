@@ -6,7 +6,6 @@ import requests
 import random
 from datetime import datetime
 import pytz
-# ESTA ES LA LÍNEA QUE FALTABA:
 from flask import Flask, render_template_string, jsonify, request
 
 # --- CONFIGURACIÓN DE LOGS ---
@@ -65,7 +64,7 @@ HTML_TEMPLATE = """
         <div class="row mb-4 align-items-center">
             <div class="col-md-8">
                 <h2 class="mb-0 text-white-bright">🤖 Solana <span class="text-warning">Grid Bot</span></h2>
-                <p class="text-white-bright opacity-75 mb-0">Monitor Profesional (Hora Local)</p>
+                <p class="text-white-bright opacity-75 mb-0">Sistema de Triangulación Avanzada (Hora Local)</p>
             </div>
             <div class="col-md-4 text-md-end">
                 <span id="status-badge" class="badge bg-secondary fs-6">Sincronizando...</span>
@@ -108,7 +107,7 @@ HTML_TEMPLATE = """
                         <small id="last-update" class="text-white-bright opacity-50 small">--:--</small>
                     </div>
                     <div id="log-box" class="log-container">
-                        <div class="text-secondary small">Listo para operar...</div>
+                        <div class="text-secondary small">Sincronizando servidores...</div>
                     </div>
                 </div>
             </div>
@@ -152,8 +151,11 @@ class GridBotEngine:
         self.sol = 0.0
         self.equity = CAPITAL_TOTAL
         self.grids = []
-        self.user_agents = [
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+        # Identidades de navegación para engañar a los servidores
+        self.identidades = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
         ]
 
     def add_log(self, mensaje, tipo="info"):
@@ -168,19 +170,26 @@ class GridBotEngine:
         if len(self.logs) > 60: self.logs.pop(0)
 
     def get_market_price(self):
-        headers = {'User-Agent': random.choice(self.user_agents)}
-        # 1. Binance
+        headers = {'User-Agent': random.choice(self.identidades)}
+        
+        # Intento 1: Binance (Espejo 1)
         try:
-            url = f"https://api.binance.com/api/v3/ticker/price?symbol=SOLUSDT"
-            res = requests.get(url, headers=headers, timeout=5)
+            res = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=SOLUSDT", headers=headers, timeout=5)
             if res.status_code == 200: return float(res.json()['price'])
         except: pass
-        # 2. CoinGecko
+
+        # Intento 2: Binance (Espejo 2)
         try:
-            url = "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd"
-            res = requests.get(url, headers=headers, timeout=5)
-            if res.status_code == 200: return float(res.json()['solana']['usd'])
+            res = requests.get("https://api1.binance.com/api/v3/ticker/price?symbol=SOLUSDT", headers=headers, timeout=5)
+            if res.status_code == 200: return float(res.json()['price'])
         except: pass
+
+        # Intento 3: CryptoCompare (Muy estable)
+        try:
+            res = requests.get("https://min-api.cryptocompare.com/data/price?fsym=SOL&tsyms=USD", headers=headers, timeout=5)
+            if res.status_code == 200: return float(res.json()['USD'])
+        except: pass
+        
         return None
 
     def setup_grids(self, precio):
@@ -195,21 +204,30 @@ class GridBotEngine:
             nivel += paso
 
     def main_loop(self):
-        self.add_log("🕵️ Sincronizando precio...")
+        self.add_log("🕵️ Buscando conexión segura...")
+        
+        # Pequeña pausa aleatoria para romper el patrón de baneo
+        time.sleep(random.uniform(1, 3))
+        
         precio_inicial = self.get_market_price()
         if not precio_inicial:
-            self.add_log("❌ Error: Todas las fuentes están bloqueadas.", "error")
+            self.add_log("❌ Error: Bloqueo de IP persistente en Render.", "error")
+            self.add_log("💡 Tip: Dale a 'Manual Deploy' en Render para cambiar IP.", "error")
             self.running = False
             return
+            
         self.setup_grids(precio_inicial)
         inversion_por_nivel = CAPITAL_TOTAL / NUMERO_GRIDS
+        
         while self.running:
             try:
                 precio_actual = self.get_market_price()
                 if not precio_actual: 
-                    time.sleep(10)
+                    time.sleep(15) # Si fallamos, esperamos más antes de reintentar
                     continue
+                
                 self.equity = self.usdt + (self.sol * precio_actual)
+                
                 for linea in self.grids:
                     if precio_actual < linea['precio'] and not linea['comprado']:
                         if self.usdt >= inversion_por_nivel:
@@ -224,7 +242,9 @@ class GridBotEngine:
                         linea['comprado'] = False
                         profit = (cant * precio_actual) - inversion_por_nivel
                         self.add_log(f"🚀 VENTA Nivel {linea['id']} | Profit: +${profit:.2f}", "venta")
-                time.sleep(random.uniform(5, 8))
+                
+                # Intervalo aleatorio "humano"
+                time.sleep(random.uniform(6, 10))
             except Exception as e:
                 time.sleep(10)
 
