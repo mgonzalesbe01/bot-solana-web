@@ -29,7 +29,7 @@ COMISION_SIMULADA = 0.001
 # ZONA HORARIA: America/Lima
 ZONA_HORARIA = pytz.timezone('America/Lima')
 
-# URL de Render para el stay_awake
+# URL de Render (Asegúrate de que sea la correcta)
 APP_URL = "https://bot-solana-martin.onrender.com" 
 # =========================================================
 
@@ -151,11 +151,8 @@ class GridBotEngine:
         self.sol = 0.0
         self.equity = CAPITAL_TOTAL
         self.grids = []
-        # Identidades de navegación para engañar a los servidores
         self.identidades = [
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
         ]
 
     def add_log(self, mensaje, tipo="info"):
@@ -171,25 +168,19 @@ class GridBotEngine:
 
     def get_market_price(self):
         headers = {'User-Agent': random.choice(self.identidades)}
-        
-        # Intento 1: Binance (Espejo 1)
+        # Binance y Respaldos
         try:
             res = requests.get("https://api.binance.com/api/v3/ticker/price?symbol=SOLUSDT", headers=headers, timeout=5)
             if res.status_code == 200: return float(res.json()['price'])
         except: pass
-
-        # Intento 2: Binance (Espejo 2)
         try:
             res = requests.get("https://api1.binance.com/api/v3/ticker/price?symbol=SOLUSDT", headers=headers, timeout=5)
             if res.status_code == 200: return float(res.json()['price'])
         except: pass
-
-        # Intento 3: CryptoCompare (Muy estable)
         try:
             res = requests.get("https://min-api.cryptocompare.com/data/price?fsym=SOL&tsyms=USD", headers=headers, timeout=5)
             if res.status_code == 200: return float(res.json()['USD'])
         except: pass
-        
         return None
 
     def setup_grids(self, precio):
@@ -205,29 +196,21 @@ class GridBotEngine:
 
     def main_loop(self):
         self.add_log("🕵️ Buscando conexión segura...")
-        
-        # Pequeña pausa aleatoria para romper el patrón de baneo
-        time.sleep(random.uniform(1, 3))
-        
+        time.sleep(1)
         precio_inicial = self.get_market_price()
         if not precio_inicial:
             self.add_log("❌ Error: Bloqueo de IP persistente en Render.", "error")
-            self.add_log("💡 Tip: Dale a 'Manual Deploy' en Render para cambiar IP.", "error")
             self.running = False
             return
-            
         self.setup_grids(precio_inicial)
         inversion_por_nivel = CAPITAL_TOTAL / NUMERO_GRIDS
-        
         while self.running:
             try:
                 precio_actual = self.get_market_price()
                 if not precio_actual: 
-                    time.sleep(15) # Si fallamos, esperamos más antes de reintentar
+                    time.sleep(15)
                     continue
-                
                 self.equity = self.usdt + (self.sol * precio_actual)
-                
                 for linea in self.grids:
                     if precio_actual < linea['precio'] and not linea['comprado']:
                         if self.usdt >= inversion_por_nivel:
@@ -242,14 +225,22 @@ class GridBotEngine:
                         linea['comprado'] = False
                         profit = (cant * precio_actual) - inversion_por_nivel
                         self.add_log(f"🚀 VENTA Nivel {linea['id']} | Profit: +${profit:.2f}", "venta")
-                
-                # Intervalo aleatorio "humano"
                 time.sleep(random.uniform(6, 10))
             except Exception as e:
                 time.sleep(10)
 
 app = Flask(__name__)
 bot = GridBotEngine()
+
+def stay_awake():
+    while True:
+        time.sleep(600)
+        if APP_URL:
+            try: requests.get(APP_URL + "/status")
+            except: pass
+
+# --- IMPORTANTE: INICIAR HILO FUERA DEL MAIN PARA GUNICORN ---
+threading.Thread(target=stay_awake, daemon=True).start()
 
 @app.route('/')
 def home(): return render_template_string(HTML_TEMPLATE)
@@ -278,4 +269,5 @@ def status():
     })
 
 if __name__ == '__main__':
+    # Esto solo corre si ejecutas el script manualmente en tu PC
     app.run(host='0.0.0.0', port=10000)
