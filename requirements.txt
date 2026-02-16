@@ -2,3 +2,4 @@ flask
 ccxt
 gunicorn
 requests
+pytz

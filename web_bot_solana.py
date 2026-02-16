@@ -5,7 +5,7 @@ import logging
 import requests
 import random
 from datetime import datetime
-from flask import Flask, render_template_string, jsonify, request
+import pytz # Librería para zonas horarias
 
 # --- CONFIGURACIÓN DE LOGS ---
 logging.basicConfig(level=logging.INFO)
@@ -24,7 +24,12 @@ CAPITAL_TOTAL = 100.00
 NUMERO_GRIDS = 6
 RANGO_PORCENTAJE = 0.03
 COMISION_SIMULADA = 0.001
-# IMPORTANTE: Reemplaza con tu URL real cuando la tengas
+
+# ZONA HORARIA: Ajustado para Perú (America/Lima)
+# Puedes cambiarlo a 'America/Mexico_City', 'America/Argentina/Buenos_Aires', etc.
+ZONA_HORARIA = pytz.timezone('America/Lima')
+
+# URL de Render para el stay_awake
 APP_URL = "https://bot-solana-martin.onrender.com" 
 # =========================================================
 
@@ -40,30 +45,16 @@ HTML_TEMPLATE = """
         body { background-color: #0b0e11; color: #eaeaea; font-family: 'Inter', sans-serif; }
         .card { background-color: #1e2329; border: none; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
         .stat-card { padding: 25px; text-align: center; border: 1px solid #2b3139; }
-        
         .btn-start { background-color: #2ebd85; border: none; color: white; font-weight: 600; padding: 12px; transition: 0.3s; }
         .btn-start:hover:not(:disabled) { background-color: #26a373; transform: scale(1.02); }
         .btn-stop { background-color: #f6465d; border: none; color: white; font-weight: 600; padding: 12px; }
-        
         .log-container { height: 400px; overflow-y: auto; background: #161a1e; border-radius: 8px; padding: 15px; font-family: 'Roboto Mono', monospace; font-size: 0.85rem; border: 1px solid #2b3139; }
-        
-        /* MEJORA DE VISIBILIDAD SOLICITADA */
         .text-white-bright { color: #ffffff !important; }
-        .text-label { color: #ffffff !important; font-weight: 600; opacity: 0.9; } /* Etiquetas ahora blancas y legibles */
-        .text-muted-custom { color: #b7bdc6 !important; font-size: 0.9em; }
-        
-        .stat-main-value { 
-            font-size: 3rem; 
-            font-weight: 800; 
-            color: #ffffff !important; 
-            text-shadow: 0 2px 12px rgba(255,255,255,0.3); 
-            margin: 5px 0; 
-        }
-        
+        .text-label { color: #ffffff !important; font-weight: 600; opacity: 0.9; }
+        .stat-main-value { font-size: 3rem; font-weight: 800; color: #ffffff !important; text-shadow: 0 2px 12px rgba(255,255,255,0.3); margin: 5px 0; }
         .text-profit { color: #2ebd85; font-weight: bold; }
         .text-loss { color: #f6465d; font-weight: bold; }
         .grid-line { border-left: 4px solid #474d57; padding-left: 10px; margin-bottom: 5px; }
-        
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-thumb { background: #474d57; border-radius: 10px; }
     </style>
@@ -73,7 +64,7 @@ HTML_TEMPLATE = """
         <div class="row mb-4 align-items-center">
             <div class="col-md-8">
                 <h2 class="mb-0 text-white-bright">🤖 Solana <span class="text-warning">Grid Bot</span></h2>
-                <p class="text-muted-custom mb-0">Tecnología de Triangulación Multifuente Activa</p>
+                <p class="text-white-bright opacity-75 mb-0">Tecnología Stealth + Hora Local Activa</p>
             </div>
             <div class="col-md-4 text-md-end">
                 <span id="status-badge" class="badge bg-secondary fs-6">Sincronizando...</span>
@@ -112,11 +103,11 @@ HTML_TEMPLATE = """
             <div class="col-lg-8">
                 <div class="card p-3 h-100">
                     <div class="d-flex justify-content-between mb-3">
-                        <h6 class="text-label mb-0 text-uppercase small fw-bold">FLUJO DE OPERACIONES</h6>
-                        <small id="last-update" class="text-muted-custom small">Update: --:--</small>
+                        <h6 class="text-label mb-0 text-uppercase small fw-bold">FLUJO DE OPERACIONES (HORA LOCAL)</h6>
+                        <small id="last-update" class="text-white-bright opacity-50 small">--:--</small>
                     </div>
                     <div id="log-box" class="log-container">
-                        <div class="text-secondary small">Esperando arranque del motor...</div>
+                        <div class="text-secondary small">Sincronizando reloj con zona horaria...</div>
                     </div>
                 </div>
             </div>
@@ -142,10 +133,6 @@ HTML_TEMPLATE = """
                 logBox.innerHTML = data.logs.join("");
                 logBox.scrollTop = logBox.scrollHeight;
                 document.getElementById('last-update').innerText = "Último tick: " + new Date().toLocaleTimeString();
-            }).catch(e => {
-                const badge = document.getElementById('status-badge');
-                badge.innerText = "RECONECTANDO...";
-                badge.className = "badge bg-warning text-dark fs-6";
             });
         }
         function startBot() { fetch('/start', {method: 'POST'}); }
@@ -164,14 +151,15 @@ class GridBotEngine:
         self.sol = 0.0
         self.equity = CAPITAL_TOTAL
         self.grids = []
-        # Fuentes de datos
         self.user_agents = [
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1'
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36'
         ]
 
     def add_log(self, mensaje, tipo="info"):
-        timestamp = datetime.now().strftime("%H:%M:%S")
+        # USAR HORA LOCAL CONFIGURADA
+        ahora_local = datetime.now(ZONA_HORARIA)
+        timestamp = ahora_local.strftime("%H:%M:%S")
+        
         color = "#848e9c"
         if tipo == "compra": color = "#2ebd85"
         if tipo == "venta": color = "#f0b90b"
@@ -181,41 +169,23 @@ class GridBotEngine:
         if len(self.logs) > 60: self.logs.pop(0)
 
     def get_market_price(self):
-        """Estrategia Multifuente: Binance -> CoinGecko -> CryptoCompare"""
         headers = {'User-Agent': random.choice(self.user_agents)}
-        
-        # 1. Intentar Binance (Varios espejos)
-        mirrors = ["https://api.binance.com", "https://api1.binance.com", "https://api2.binance.com"]
-        for base in mirrors:
-            try:
-                url = f"{base}/api/v3/ticker/price?symbol=SOLUSDT"
-                res = requests.get(url, headers=headers, timeout=5)
-                if res.status_code == 200:
-                    return float(res.json()['price'])
-            except: continue
+        # Estrategia Multifuente para evitar bloqueos de IP
+        try:
+            url = f"https://api.binance.com/api/v3/ticker/price?symbol=SOLUSDT"
+            res = requests.get(url, headers=headers, timeout=5)
+            if res.status_code == 200: return float(res.json()['price'])
+        except: pass
 
-        # 2. Intentar CoinGecko (Si Binance bloquea IP)
         try:
             url = "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd"
             res = requests.get(url, headers=headers, timeout=5)
-            if res.status_code == 200:
-                # self.add_log("💡 Usando fuente de respaldo: CoinGecko")
-                return float(res.json()['solana']['usd'])
+            if res.status_code == 200: return float(res.json()['solana']['usd'])
         except: pass
-
-        # 3. Intentar CryptoCompare (Último recurso)
-        try:
-            url = "https://min-api.cryptocompare.com/data/price?fsym=SOL&tsyms=USD"
-            res = requests.get(url, headers=headers, timeout=5)
-            if res.status_code == 200:
-                # self.add_log("💡 Usando fuente de respaldo: CryptoCompare")
-                return float(res.json()['USD'])
-        except: pass
-
         return None
 
     def setup_grids(self, precio):
-        self.add_log(f"🏗️ Arquitectura Grid fijada en ${precio:.2f}")
+        self.add_log(f"🏗️ Grid inicializado en ${precio:.2f}")
         techo = precio * (1 + RANGO_PORCENTAJE)
         piso = precio * (1 - RANGO_PORCENTAJE)
         paso = (techo - piso) / NUMERO_GRIDS
@@ -226,12 +196,11 @@ class GridBotEngine:
             nivel += paso
 
     def main_loop(self):
-        self.add_log("🕵️ Iniciando triangulación de precio...")
-        
+        self.add_log("🕵️ Sincronizando precio en tiempo real...")
         precio_inicial = self.get_market_price()
         
         if not precio_inicial:
-            self.add_log("❌ Error: Todas las fuentes de datos están bloqueadas.", "error")
+            self.add_log("❌ Error: Todas las fuentes están bloqueadas.", "error")
             self.running = False
             return
             
@@ -263,20 +232,12 @@ class GridBotEngine:
                         profit = (cant * precio_actual) - inversion_por_nivel
                         self.add_log(f"🚀 VENTA Nivel {linea['id']} | Profit: +${profit:.2f}", "venta")
                 
-                time.sleep(random.uniform(5, 8)) # Intervalo humano
+                time.sleep(random.uniform(5, 8))
             except Exception as e:
-                logger.error(f"Error: {e}")
                 time.sleep(10)
 
 app = Flask(__name__)
 bot = GridBotEngine()
-
-def stay_awake():
-    while True:
-        time.sleep(600)
-        if APP_URL:
-            try: requests.get(APP_URL + "/status")
-            except: pass
 
 @app.route('/')
 def home(): return render_template_string(HTML_TEMPLATE)
@@ -305,5 +266,4 @@ def status():
     })
 
 if __name__ == '__main__':
-    threading.Thread(target=stay_awake, daemon=True).start()
     app.run(host='0.0.0.0', port=10000)
