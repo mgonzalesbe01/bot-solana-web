@@ -24,7 +24,7 @@ CAPITAL_TOTAL = 100.00
 NUMERO_GRIDS = 6
 RANGO_PORCENTAJE = 0.03
 COMISION_SIMULADA = 0.001
-# URL de Render para el stay_awake
+# IMPORTANTE: Reemplaza con tu URL real cuando la tengas
 APP_URL = "https://bot-solana-martin.onrender.com" 
 # =========================================================
 
@@ -40,16 +40,30 @@ HTML_TEMPLATE = """
         body { background-color: #0b0e11; color: #eaeaea; font-family: 'Inter', sans-serif; }
         .card { background-color: #1e2329; border: none; border-radius: 12px; margin-bottom: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.5); }
         .stat-card { padding: 25px; text-align: center; border: 1px solid #2b3139; }
+        
         .btn-start { background-color: #2ebd85; border: none; color: white; font-weight: 600; padding: 12px; transition: 0.3s; }
         .btn-start:hover:not(:disabled) { background-color: #26a373; transform: scale(1.02); }
         .btn-stop { background-color: #f6465d; border: none; color: white; font-weight: 600; padding: 12px; }
+        
         .log-container { height: 400px; overflow-y: auto; background: #161a1e; border-radius: 8px; padding: 15px; font-family: 'Roboto Mono', monospace; font-size: 0.85rem; border: 1px solid #2b3139; }
+        
+        /* MEJORA DE VISIBILIDAD SOLICITADA */
         .text-white-bright { color: #ffffff !important; }
-        .text-label { color: #d1d4dc !important; font-weight: 500; }
-        .stat-main-value { font-size: 2.8rem; font-weight: 800; color: #ffffff !important; text-shadow: 0 2px 10px rgba(255,255,255,0.2); margin: 5px 0; }
+        .text-label { color: #ffffff !important; font-weight: 600; opacity: 0.9; } /* Etiquetas ahora blancas y legibles */
+        .text-muted-custom { color: #b7bdc6 !important; font-size: 0.9em; }
+        
+        .stat-main-value { 
+            font-size: 3rem; 
+            font-weight: 800; 
+            color: #ffffff !important; 
+            text-shadow: 0 2px 12px rgba(255,255,255,0.3); 
+            margin: 5px 0; 
+        }
+        
         .text-profit { color: #2ebd85; font-weight: bold; }
         .text-loss { color: #f6465d; font-weight: bold; }
         .grid-line { border-left: 4px solid #474d57; padding-left: 10px; margin-bottom: 5px; }
+        
         ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-thumb { background: #474d57; border-radius: 10px; }
     </style>
@@ -59,38 +73,38 @@ HTML_TEMPLATE = """
         <div class="row mb-4 align-items-center">
             <div class="col-md-8">
                 <h2 class="mb-0 text-white-bright">🤖 Solana <span class="text-warning">Grid Bot</span></h2>
-                <p class="text-label mb-0">Protección Anti-Bloqueo Activada</p>
+                <p class="text-muted-custom mb-0">Tecnología de Triangulación Multifuente Activa</p>
             </div>
             <div class="col-md-4 text-md-end">
-                <span id="status-badge" class="badge bg-secondary fs-6">Iniciando...</span>
+                <span id="status-badge" class="badge bg-secondary fs-6">Sincronizando...</span>
             </div>
         </div>
         <div class="row">
             <div class="col-lg-4">
                 <div class="card stat-card">
-                    <small class="text-label text-uppercase small">Valor Total Cartera</small>
+                    <small class="text-label text-uppercase small">VALOR ACTUAL CARTERA</small>
                     <div id="equity-val" class="stat-main-value">$0.00</div>
                     <div id="pnl-val" class="fs-5">$0.00 (0%)</div>
                 </div>
                 <div class="card p-3">
-                    <h6 class="text-label mb-3 text-uppercase small fw-bold">Panel de Control</h6>
+                    <h6 class="text-label mb-3 text-uppercase small fw-bold">PANEL DE CONTROL</h6>
                     <div class="d-grid gap-2">
                         <button id="btn-start" onclick="startBot()" class="btn btn-start">ACTIVAR ALGORITMO</button>
                         <button id="btn-stop" onclick="stopBot()" class="btn btn-danger btn-stop" disabled>DETENER SISTEMA</button>
                     </div>
                 </div>
                 <div class="card p-3">
-                    <h6 class="text-label mb-3 text-uppercase small fw-bold">Desglose de Fondos</h6>
+                    <h6 class="text-label mb-3 text-uppercase small fw-bold">DESGLOSE DE CAPITAL</h6>
                     <div class="d-flex justify-content-between mb-2">
                         <span class="text-label">Capital Inicial:</span>
                         <span class="text-white-bright fw-bold">$100.00</span>
                     </div>
                     <div class="d-flex justify-content-between mb-2">
-                        <span class="text-label">Saldo USDT:</span>
+                        <span class="text-label">Disponible USDT:</span>
                         <span id="usdt-bal" class="text-white-bright fw-bold">$0.00</span>
                     </div>
                     <div class="d-flex justify-content-between">
-                        <span class="text-label">Saldo SOL:</span>
+                        <span class="text-label">Invertido SOL:</span>
                         <span id="sol-bal" class="fw-bold text-warning">0.0000 SOL</span>
                     </div>
                 </div>
@@ -98,11 +112,11 @@ HTML_TEMPLATE = """
             <div class="col-lg-8">
                 <div class="card p-3 h-100">
                     <div class="d-flex justify-content-between mb-3">
-                        <h6 class="text-label mb-0 text-uppercase small fw-bold">Actividad del Algoritmo</h6>
-                        <small id="last-update" class="text-label small">Update: --:--</small>
+                        <h6 class="text-label mb-0 text-uppercase small fw-bold">FLUJO DE OPERACIONES</h6>
+                        <small id="last-update" class="text-muted-custom small">Update: --:--</small>
                     </div>
                     <div id="log-box" class="log-container">
-                        <div class="text-secondary small">Listo para operar en la nube...</div>
+                        <div class="text-secondary small">Esperando arranque del motor...</div>
                     </div>
                 </div>
             </div>
@@ -114,7 +128,7 @@ HTML_TEMPLATE = """
                 document.getElementById('btn-start').disabled = data.running;
                 document.getElementById('btn-stop').disabled = !data.running;
                 const badge = document.getElementById('status-badge');
-                badge.innerText = data.running ? "BOT ACTIVO" : "BOT EN PAUSA";
+                badge.innerText = data.running ? "BOT TRABAJANDO" : "BOT EN PAUSA";
                 badge.className = "badge fs-6 " + (data.running ? "bg-success" : "bg-danger");
                 document.getElementById('equity-val').innerText = "$" + data.equity.toFixed(2);
                 document.getElementById('usdt-bal').innerText = "$" + data.usdt.toFixed(2);
@@ -127,7 +141,7 @@ HTML_TEMPLATE = """
                 const logBox = document.getElementById('log-box');
                 logBox.innerHTML = data.logs.join("");
                 logBox.scrollTop = logBox.scrollHeight;
-                document.getElementById('last-update').innerText = "Update: " + new Date().toLocaleTimeString();
+                document.getElementById('last-update').innerText = "Último tick: " + new Date().toLocaleTimeString();
             }).catch(e => {
                 const badge = document.getElementById('status-badge');
                 badge.innerText = "RECONECTANDO...";
@@ -146,22 +160,15 @@ class GridBotEngine:
     def __init__(self):
         self.running = False
         self.logs = []
-        # Lista de espejos de Binance para rotación
-        self.mirrors = [
-            "https://api.binance.com",
-            "https://api1.binance.com",
-            "https://api2.binance.com",
-            "https://api3.binance.com"
-        ]
-        self.current_mirror_idx = 0
-        self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-            'Accept': 'application/json'
-        }
         self.usdt = CAPITAL_TOTAL
         self.sol = 0.0
         self.equity = CAPITAL_TOTAL
         self.grids = []
+        # Fuentes de datos
+        self.user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.2 Mobile/15E148 Safari/604.1'
+        ]
 
     def add_log(self, mensaje, tipo="info"):
         timestamp = datetime.now().strftime("%H:%M:%S")
@@ -174,33 +181,41 @@ class GridBotEngine:
         if len(self.logs) > 60: self.logs.pop(0)
 
     def get_market_price(self):
-        """Intenta obtener el precio rotando entre diferentes servidores de Binance"""
-        symbol = PAR_MONEDA.replace('/', '')
+        """Estrategia Multifuente: Binance -> CoinGecko -> CryptoCompare"""
+        headers = {'User-Agent': random.choice(self.user_agents)}
         
-        # Intentamos con 3 espejos distintos si fallan
-        for _ in range(3):
-            base_url = self.mirrors[self.current_mirror_idx]
-            url = f"{base_url}/api/v3/ticker/price?symbol={symbol}"
-            
+        # 1. Intentar Binance (Varios espejos)
+        mirrors = ["https://api.binance.com", "https://api1.binance.com", "https://api2.binance.com"]
+        for base in mirrors:
             try:
-                response = requests.get(url, headers=self.headers, timeout=8)
-                if response.status_code == 200:
-                    return float(response.json()['price'])
-                elif response.status_code == 429:
-                    self.add_log("⚠️ Límite de IP alcanzado. Rotando servidor...", "error")
-                else:
-                    logger.error(f"Error {response.status_code} en {base_url}")
-            except Exception as e:
-                logger.error(f"Fallo en espejo {base_url}: {e}")
-            
-            # Rotar al siguiente espejo
-            self.current_mirror_idx = (self.current_mirror_idx + 1) % len(self.mirrors)
-            time.sleep(1)
-            
+                url = f"{base}/api/v3/ticker/price?symbol=SOLUSDT"
+                res = requests.get(url, headers=headers, timeout=5)
+                if res.status_code == 200:
+                    return float(res.json()['price'])
+            except: continue
+
+        # 2. Intentar CoinGecko (Si Binance bloquea IP)
+        try:
+            url = "https://api.coingecko.com/api/v3/simple/price?ids=solana&vs_currencies=usd"
+            res = requests.get(url, headers=headers, timeout=5)
+            if res.status_code == 200:
+                # self.add_log("💡 Usando fuente de respaldo: CoinGecko")
+                return float(res.json()['solana']['usd'])
+        except: pass
+
+        # 3. Intentar CryptoCompare (Último recurso)
+        try:
+            url = "https://min-api.cryptocompare.com/data/price?fsym=SOL&tsyms=USD"
+            res = requests.get(url, headers=headers, timeout=5)
+            if res.status_code == 200:
+                # self.add_log("💡 Usando fuente de respaldo: CryptoCompare")
+                return float(res.json()['USD'])
+        except: pass
+
         return None
 
     def setup_grids(self, precio):
-        self.add_log(f"🏗️ Rejilla configurada en ${precio:.2f}")
+        self.add_log(f"🏗️ Arquitectura Grid fijada en ${precio:.2f}")
         techo = precio * (1 + RANGO_PORCENTAJE)
         piso = precio * (1 - RANGO_PORCENTAJE)
         paso = (techo - piso) / NUMERO_GRIDS
@@ -211,18 +226,14 @@ class GridBotEngine:
             nivel += paso
 
     def main_loop(self):
-        self.add_log("🌐 Buscando puerta de enlace segura...")
+        self.add_log("🕵️ Iniciando triangulación de precio...")
         
         precio_inicial = self.get_market_price()
         
         if not precio_inicial:
-            self.add_log("❌ Binance bloqueó todos los espejos. Esperando 30s...", "error")
-            time.sleep(30)
-            precio_inicial = self.get_market_price()
-            if not precio_inicial:
-                self.add_log("⚠️ Baneo de IP persistente en Render. Intenta reiniciar más tarde.", "error")
-                self.running = False
-                return
+            self.add_log("❌ Error: Todas las fuentes de datos están bloqueadas.", "error")
+            self.running = False
+            return
             
         self.setup_grids(precio_inicial)
         inversion_por_nivel = CAPITAL_TOTAL / NUMERO_GRIDS
@@ -242,22 +253,20 @@ class GridBotEngine:
                             self.usdt -= inversion_por_nivel
                             self.sol += (inversion_por_nivel / precio_actual) * (1 - COMISION_SIMULADA)
                             linea['comprado'] = True
-                            self.add_log(f"🟢 COMPRA en Nivel {linea['id']} (${precio_actual:.2f})", "compra")
+                            self.add_log(f"🟢 COMPRA Nivel {linea['id']} (${precio_actual:.2f})", "compra")
                             
                     elif linea['comprado'] and precio_actual > (linea['precio'] * 1.015):
-                        cantidad_venta = inversion_por_nivel / linea['precio']
-                        self.sol -= cantidad_venta
-                        self.usdt += (cantidad_venta * precio_actual) * (1 - COMISION_SIMULADA)
+                        cant = inversion_por_nivel / linea['precio']
+                        self.sol -= cant
+                        self.usdt += (cant * precio_actual) * (1 - COMISION_SIMULADA)
                         linea['comprado'] = False
-                        profit = (cantidad_venta * precio_actual) - inversion_por_nivel
-                        self.add_log(f"🚀 VENTA en Nivel {linea['id']} | Profit: +${profit:.2f}", "venta")
+                        profit = (cant * precio_actual) - inversion_por_nivel
+                        self.add_log(f"🚀 VENTA Nivel {linea['id']} | Profit: +${profit:.2f}", "venta")
                 
-                # Pausa más larga para evitar que Binance nos detecte por frecuencia
-                time.sleep(random.uniform(4, 7))
-                
+                time.sleep(random.uniform(5, 8)) # Intervalo humano
             except Exception as e:
-                logger.error(f"Error en loop: {e}")
-                time.sleep(15)
+                logger.error(f"Error: {e}")
+                time.sleep(10)
 
 app = Flask(__name__)
 bot = GridBotEngine()
